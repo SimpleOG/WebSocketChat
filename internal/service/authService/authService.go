@@ -5,23 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
-	"github.com/SimpleOG/WebSocketChat/pkg"
+	"github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/hashing"
+	"github.com/golang-jwt/jwt"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
+	"time"
 )
 
 type AuthorizationService interface {
 	RegisterUser(ctx context.Context, userData db.CreateUserParams) (int32, error)
 	GetUser(ctx context.Context, userId int32) (db.User, error)
-	LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (db.User, error)
+	LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (string, error)
 }
 
 type Authorization struct {
-	maker auth.JWTMaker
+	maker JWTTokens.JWTMaker
 	q     db.Querier
 }
 
-func NewAuthService(maker auth.JWTMaker, q db.Querier) AuthorizationService {
+func NewAuthService(maker JWTTokens.JWTMaker, q db.Querier) AuthorizationService {
 	return &Authorization{
 		maker: maker,
 		q:     q,
@@ -52,16 +55,28 @@ func (a *Authorization) GetUser(ctx context.Context, userId int32) (db.User, err
 	return user, nil
 }
 
-func (a *Authorization) LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (db.User, error) {
+func (a *Authorization) LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (string, error) {
+	unameEmail := db.GetUserByUsernameOrEmailParams{
+		Username: loginData.Username,
+		Email:    loginData.Email,
+	}
 
-	hashedPass, err := hashing.GeneratePassword(loginData.Password)
+	//Сначала найти юзера и взять его хеш
+	user, err := a.q.GetUserByUsernameOrEmail(ctx, unameEmail)
 	if err != nil {
-		return db.User{}, err
+		return "", err
 	}
-	loginData.Password = hashedPass
-	User, err := a.q.GetUserForLogin(ctx, loginData)
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password))
 	if err != nil {
-		return db.User{}, err
+		return "", err
 	}
-	return User, err
+	claims := &jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(60 * time.Minute).Unix(),
+	}
+	userToken, err := a.maker.CreateToken(claims)
+	if err != nil {
+		return "", err
+	}
+	return userToken, err
 }

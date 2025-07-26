@@ -18,7 +18,7 @@ type Querier interface {
 	GetMessage(ctx context.Context, messageID int32) (Message, error)
 	GetMessageStatus(ctx context.Context, arg GetMessageStatusParams) (MessagesStatus, error)
 	GetMessageWithStatus(ctx context.Context, arg GetMessageWithStatusParams) (GetMessageWithStatusRow, error)
-	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserByUsernameOrEmail(ctx context.Context, arg GetUserByUsernameOrEmailParams) (User, error)
 	GetUserForLogin(ctx context.Context, arg GetUserForLoginParams) (User, error)
 	GetUsersById(ctx context.Context, id int32) (User, error)
 	GetUsersWithLessDate(ctx context.Context, dateOfBirth string) ([]User, error)

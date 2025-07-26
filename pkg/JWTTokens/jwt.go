@@ -1,13 +1,12 @@
-package auth
+package JWTTokens
 
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt"
-	"time"
 )
 
 type JWTMaker interface {
-	CreateToken(user_id int32, duration time.Duration) (string, error)
+	CreateToken(claims *jwt.MapClaims) (string, error)
 	VerifyToken(tokenStr string) (*jwt.MapClaims, error)
 }
 
@@ -19,11 +18,8 @@ func NewJWTMaker(secretKey string) JWTMaker {
 	return &Maker{secretKey: secretKey}
 }
 
-func (j *Maker) CreateToken(user_id int32, duration time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.MapClaims{
-		"sub": user_id,
-		"exp": time.Now().Add(duration).Unix(),
-	})
+func (j *Maker) CreateToken(claims *jwt.MapClaims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(j.secretKey))
 	if err != nil {
 		return "", fmt.Errorf("cannot sign token %v", err)
