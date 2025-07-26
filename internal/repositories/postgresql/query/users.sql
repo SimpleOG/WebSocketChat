@@ -6,16 +6,16 @@ INSERT INTO users (username,
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 
--- name: GetUserByUsername :one
+-- name: GetUserByUsernameOrEmail :one
 SELECT *
 FROM users
-WHERE username = $1;
+WHERE username = $1 or email=$2;
 
 -- name: GetUserForLogin :one
 SELECT *
 FROM users
-WHERE (username = $1 or email = $1)
-  and password = $2;
+WHERE (username = $1 or email = $2)
+  and password = $3;
 
 -- name: GetUsersById :one
 SELECT *

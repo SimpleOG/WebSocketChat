@@ -50,11 +50,12 @@ func (u *UserController) Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnprocessableEntity, response.ErrorResponse(err))
 		return
 	}
-	user, err := u.service.AuthService.LoginUser(ctx, userInfo)
+	userToken, err := u.service.AuthService.LoginUser(ctx, userInfo)
 	if err != nil {
 		u.logger.Error(fmt.Sprintf("cannot login  user %v : ", userInfo.Username), zap.Error(err))
 		ctx.JSON(http.StatusUnprocessableEntity, response.ErrorResponse(err))
 		return
 	}
-	u.logger.Info(fmt.Sprintf("User %d is authorized ", user.ID))
+	u.logger.Info(fmt.Sprintf("User %d is authorized "))
+	ctx.JSON(200, userToken)
 }

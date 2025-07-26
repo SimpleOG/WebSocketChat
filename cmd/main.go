@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/SimpleOG/WebSocketChat/internal/api/middlewares"
 	"github.com/SimpleOG/WebSocketChat/internal/api/server"
 	"github.com/SimpleOG/WebSocketChat/internal/logger"
 	db "github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/redis"
 	"github.com/SimpleOG/WebSocketChat/internal/service"
 	"github.com/SimpleOG/WebSocketChat/internal/service/Pools"
-	auth "github.com/SimpleOG/WebSocketChat/pkg"
+	auth "github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/config"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -43,14 +44,20 @@ func main() {
 	}
 	logger.Info("Db successfuly started ")
 	querier := db.New(connPool)
-	jwtMaker := auth.NewJWTMaker(config.SecretKey)
+	if err := runDBMigration(config.MigrationUrl, config.DBDSource); err != nil && err.Error() != "no change" {
+		logger.Fatal("Cannot start migration", zap.Error(err))
+		return
+	}
 	redis, err := redis.NewRedisClient(ctx, logger, config)
 	if err != nil {
 		logger.Fatal("Cannot connect to redis :", zap.Error(err))
 		return
 	}
+	jwtMaker := auth.NewJWTMaker(config.SecretKey)
+
 	service := service.NewService(logger, jwtMaker, querier, redis, config)
 	pool := Pools.NewPool(querier, redis, config, logger)
+
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
@@ -60,11 +67,9 @@ func main() {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-	if err := runDBMigration(config.MigrationUrl, config.DBDSource); err != nil && err.Error() != "no change" {
-		logger.Fatal("Cannot start migration", zap.Error(err))
-		return
-	}
-	server := server.NewServer(logger, router, service, pool)
+
+	middlewares := middlewares.NewMiddleware(jwtMaker)
+	server := server.NewServer(logger, router, service, pool, middlewares)
 	if err := server.Run(ctx, config.ServerAddress); err != nil {
 		logger.Fatal("Cannot start server  :", zap.Error(err))
 		return
