@@ -10,16 +10,35 @@ import (
 	"go.uber.org/zap"
 )
 
-type Client struct {
+type Clients struct {
 	UserInfo db.User
 	MsgChan  chan string // канал в который приходят новые сообщения
 	conn     *websocket.Conn
 	logger   logger.Logger
-	redis    redis.RedisInterface
+	Redis    redis.RedisInterface
+}
+
+func CreateClient(user db.User, conn *websocket.Conn, logger logger.Logger) Clients {
+	return Clients{
+		UserInfo: user,
+		MsgChan:  make(chan string, 1024),
+		conn:     conn,
+		logger:   logger,
+	}
+}
+
+func CreateClient(user db.User, conn *websocket.Conn, logger logger.Logger, redis redis.RedisInterface) Clients {
+	return Clients{
+		UserInfo: user,
+		MsgChan:  make(chan string, 1024),
+		conn:     conn,
+		logger:   logger,
+		redis:    redis,
+	}
 }
 
 // Считываем всё что клиент пишет в соединение вебсокета
-func (c *Client) ReadMessageFromClient(ctx context.Context, roomHash string) {
+func (c *Clients) ReadMessageFromClient(ctx context.Context, roomHash string) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -41,7 +60,7 @@ func (c *Client) ReadMessageFromClient(ctx context.Context, roomHash string) {
 				Msg_content: string(msg),
 			}
 			//Кладём сообщение в канал редиса
-			err = c.redis.SendMessageToChan(ctx, roomHash, message)
+			err = c.Redis.SendMessageToChan(ctx, roomHash, message)
 			if err != nil {
 				c.logger.Error("error while trying to send to redis  message",
 					zap.Error(err),
@@ -54,7 +73,7 @@ func (c *Client) ReadMessageFromClient(ctx context.Context, roomHash string) {
 }
 
 // Отправляем в вебсокет сообщения
-func (c *Client) WriteMessageToClient(ctx context.Context) {
+func (c *Clients) WriteMessageToClient(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():

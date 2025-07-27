@@ -4,30 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/SimpleOG/WebSocketChat/internal/logger"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
-	"github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
+	auth "github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/hashing"
-	"github.com/golang-jwt/jwt"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
-	"time"
+	"go.uber.org/zap"
 )
 
 type AuthorizationService interface {
 	RegisterUser(ctx context.Context, userData db.CreateUserParams) (int32, error)
 	GetUser(ctx context.Context, userId int32) (db.User, error)
-	LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (string, error)
+	LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (db.User, error)
 }
 
 type Authorization struct {
-	maker JWTTokens.JWTMaker
-	q     db.Querier
+	logger logger.Logger
+	maker  auth.JWTMaker
+	q      db.Querier
 }
 
-func NewAuthService(maker JWTTokens.JWTMaker, q db.Querier) AuthorizationService {
+func NewAuthService(maker auth.JWTMaker, q db.Querier, logger logger.Logger) AuthorizationService {
 	return &Authorization{
-		maker: maker,
-		q:     q,
+		maker:  maker,
+		logger: logger,
+		q:      q,
 	}
 }
 
@@ -47,7 +48,9 @@ func (a *Authorization) RegisterUser(ctx context.Context, userData db.CreateUser
 func (a *Authorization) GetUser(ctx context.Context, userId int32) (db.User, error) {
 	user, err := a.q.GetUsersById(ctx, userId)
 	if err != nil {
+
 		if !errors.Is(err, pgx.ErrNoRows) {
+			a.logger.Error("Отсуствует пользователь с id ", zap.Int32("id", user.ID))
 			return db.User{}, fmt.Errorf("no users was detected")
 		}
 	}
@@ -55,28 +58,16 @@ func (a *Authorization) GetUser(ctx context.Context, userId int32) (db.User, err
 	return user, nil
 }
 
-func (a *Authorization) LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (string, error) {
-	unameEmail := db.GetUserByUsernameOrEmailParams{
-		Username: loginData.Username,
-		Email:    loginData.Email,
-	}
+func (a *Authorization) LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (db.User, error) {
 
-	//Сначала найти юзера и взять его хеш
-	user, err := a.q.GetUserByUsernameOrEmail(ctx, unameEmail)
+	hashedPass, err := hashing.GeneratePassword(loginData.Password)
 	if err != nil {
-		return "", err
+		return db.User{}, err
 	}
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password))
+	loginData.Password = hashedPass
+	User, err := a.q.GetUserForLogin(ctx, loginData)
 	if err != nil {
-		return "", err
+		return db.User{}, err
 	}
-	claims := &jwt.MapClaims{
-		"sub": user.ID,
-		"exp": time.Now().Add(60 * time.Minute).Unix(),
-	}
-	userToken, err := a.maker.CreateToken(claims)
-	if err != nil {
-		return "", err
-	}
-	return userToken, err
+	return User, err
 }

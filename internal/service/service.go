@@ -17,7 +17,7 @@ type Service struct {
 
 func NewService(logger logger.Logger, maker auth.JWTMaker, querier db.Querier, redis redis.RedisInterface, config config.Config) *Service {
 	return &Service{
-		AuthService: AuthService.NewAuthService(maker, querier),
+		AuthService: AuthService.NewAuthService(maker, querier, logger),
 		Pool:        Pools.NewPool(querier, redis, config, logger),
 	}
 }

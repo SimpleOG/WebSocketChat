@@ -18,17 +18,17 @@ import (
 type Rooms interface {
 	GetRoomHash() string
 	ServeRoom(ctx context.Context)
-	GetRoomChan() chan Clients.Client
+	GetRoomChan() chan Clients.Clients
 }
 
 type Room struct {
 	roomHash         string //Хэш комнаты (состоит из хеша всех id)
 	redis            redis.RedisInterface
 	querier          db.Querier
-	newClient        chan Clients.Client         //Для добавления новых пользователей в чат
-	clientsForDelete chan int32                  //Для удаления пользователей из чата
-	msgChan          chan models.ClientMessage   //Для сообщений
-	clients          map[Clients.Client]struct{} // Текущие участники чата
+	newClient        chan Clients.Clients          //Для добавления новых пользователей в чат
+	clientsForDelete chan int32                    //Для удаления пользователей из чата
+	msgChan          chan models.ClientMessage     //Для сообщений
+	clients          map[*Clients.Clients]struct{} // Текущие участники чата
 	mu               sync.RWMutex
 	logger           logger.Logger
 }
@@ -40,8 +40,8 @@ func NewRoom(roomHash string, querier db.Querier, redis redis.RedisInterface, co
 		querier:          querier,
 		msgChan:          make(chan models.ClientMessage, config.MaxMsgBuffSize),
 		clientsForDelete: make(chan int32, config.MaxEntryBuffSize),
-		newClient:        make(chan Clients.Client, config.MaxEntryBuffSize),
-		clients:          make(map[Clients.Client]struct{}, config.MaxEntryBuffSize),
+		newClient:        make(chan Clients.Clients, config.MaxEntryBuffSize),
+		clients:          make(map[*Clients.Clients]struct{}, config.MaxEntryBuffSize),
 	}
 }
 
@@ -49,7 +49,7 @@ func NewRoom(roomHash string, querier db.Querier, redis redis.RedisInterface, co
 func (r *Room) GetRoomHash() string {
 	return r.roomHash
 }
-func (r *Room) GetRoomChan() chan Clients.Client {
+func (r *Room) GetRoomChan() chan Clients.Clients {
 	return r.newClient
 }
 func (r *Room) ReadRedisChannel(ctx context.Context) {
@@ -87,7 +87,7 @@ func (r *Room) ServeRoom(ctx context.Context) {
 	for {
 		select {
 		case newClient := <-r.newClient:
-			go r.AddNewClientIntoChat(newClient)
+			go r.AddNewClientIntoChat(&newClient)
 		case ClientForDelete := <-r.clientsForDelete:
 			go r.DeleteClientFromRoom(ClientForDelete)
 		case msg := <-r.msgChan:
@@ -96,7 +96,7 @@ func (r *Room) ServeRoom(ctx context.Context) {
 
 	}
 }
-func (r *Room) AddNewClientIntoChat(client Clients.Client) {
+func (r *Room) AddNewClientIntoChat(client *Clients.Clients) {
 	r.mu.Lock()
 	r.clients[client] = struct{}{}
 	r.logger.Info("new user added into room ")
