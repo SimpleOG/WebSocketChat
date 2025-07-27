@@ -27,16 +27,6 @@ func CreateClient(user db.User, conn *websocket.Conn, logger logger.Logger) Clie
 	}
 }
 
-func CreateClient(user db.User, conn *websocket.Conn, logger logger.Logger, redis redis.RedisInterface) Clients {
-	return Clients{
-		UserInfo: user,
-		MsgChan:  make(chan string, 1024),
-		conn:     conn,
-		logger:   logger,
-		redis:    redis,
-	}
-}
-
 // Считываем всё что клиент пишет в соединение вебсокета
 func (c *Clients) ReadMessageFromClient(ctx context.Context, roomHash string) {
 	for {
