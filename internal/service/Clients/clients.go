@@ -15,16 +15,15 @@ type Clients struct {
 	MsgChan  chan string // канал в который приходят новые сообщения
 	conn     *websocket.Conn
 	logger   logger.Logger
-	redis    redis.RedisInterface
+	Redis    redis.RedisInterface
 }
 
-func CreateClient(user db.User, conn *websocket.Conn, logger logger.Logger, redis redis.RedisInterface) Clients {
+func CreateClient(user db.User, conn *websocket.Conn, logger logger.Logger) Clients {
 	return Clients{
 		UserInfo: user,
 		MsgChan:  make(chan string, 1024),
 		conn:     conn,
 		logger:   logger,
-		redis:    redis,
 	}
 }
 
@@ -51,7 +50,7 @@ func (c *Clients) ReadMessageFromClient(ctx context.Context, roomHash string) {
 				Msg_content: string(msg),
 			}
 			//Кладём сообщение в канал редиса
-			err = c.redis.SendMessageToChan(ctx, roomHash, message)
+			err = c.Redis.SendMessageToChan(ctx, roomHash, message)
 			if err != nil {
 				c.logger.Error("error while trying to send to redis  message",
 					zap.Error(err),

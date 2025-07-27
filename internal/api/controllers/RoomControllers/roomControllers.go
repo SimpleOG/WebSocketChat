@@ -75,15 +75,11 @@ func (r *Room) ServeRooms(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(err))
 		return
 	}
-	// создаем хеш и проверяем есть ли такой среди комнат
+	// создаем хеш и проверяем есть ли такой среди комнат если есть то создаем из юзера клиента
 	hash := hashing.HashUsersForRoomUnique(users.users)
-	client := Clients.CreateClient(user, ws, r.logger, r)
-	r.service.Pool.CheckRoom(ctx, hash)
-	//если есть то
-	//Создаем из юзера клиента
-	currentClient := Clients.Clients{}
-	//присоединяем юзера к комнате
-	r.service.Pool.CheckRoom(ctx, hash, currentClient)
-	//если нет, то создаем комнату и закидываем в бд
+	client := Clients.CreateClient(user, ws, r.logger)
+	r.service.Pool.CheckRoom(ctx, hash, &client)
+	go client.ReadMessageFromClient(ctx, hash)
+	client.WriteMessageToClient(ctx)
 
 }

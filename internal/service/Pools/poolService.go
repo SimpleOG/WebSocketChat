@@ -15,7 +15,7 @@ import (
 // Проброс наружу методов
 type Pools interface {
 	ServePool(ctx context.Context)
-	CheckRoom(ctx context.Context, hash string, client Clients.Clients)
+	CheckRoom(ctx context.Context, hash string, client *Clients.Clients)
 	DeleteRoom(hash string)
 }
 type Pool struct {
@@ -58,10 +58,11 @@ func (p *Pool) ServePool(ctx context.Context) {
 }
 
 // Выставляем наружу метод, который проверяет комнату
-func (p *Pool) CheckRoom(ctx context.Context, hash string, client Clients.Clients) {
+func (p *Pool) CheckRoom(ctx context.Context, hash string, client *Clients.Clients) {
 	//Если комната есть, то засовывает в неё нового юзера
 	if room, ok := p.rooms[hash]; ok {
-		room <- client
+		client.Redis = p.redis
+		room <- *client
 	} else { //Если комнаты нет, то создаёт комнату
 		p.CreateNewRoom(ctx, hash)
 	}
