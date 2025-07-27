@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/SimpleOG/WebSocketChat/internal/logger"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
 	"github.com/SimpleOG/WebSocketChat/pkg"
 	"github.com/SimpleOG/WebSocketChat/util/hashing"
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 type AuthorizationService interface {
@@ -17,14 +19,16 @@ type AuthorizationService interface {
 }
 
 type Authorization struct {
-	maker auth.JWTMaker
-	q     db.Querier
+	logger logger.Logger
+	maker  auth.JWTMaker
+	q      db.Querier
 }
 
-func NewAuthService(maker auth.JWTMaker, q db.Querier) AuthorizationService {
+func NewAuthService(maker auth.JWTMaker, q db.Querier, logger logger.Logger) AuthorizationService {
 	return &Authorization{
-		maker: maker,
-		q:     q,
+		maker:  maker,
+		logger: logger,
+		q:      q,
 	}
 }
 
@@ -44,7 +48,9 @@ func (a *Authorization) RegisterUser(ctx context.Context, userData db.CreateUser
 func (a *Authorization) GetUser(ctx context.Context, userId int32) (db.User, error) {
 	user, err := a.q.GetUsersById(ctx, userId)
 	if err != nil {
+
 		if !errors.Is(err, pgx.ErrNoRows) {
+			a.logger.Error("Отсуствует пользователь с id ", zap.Int32("id", user.ID))
 			return db.User{}, fmt.Errorf("no users was detected")
 		}
 	}

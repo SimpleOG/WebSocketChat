@@ -15,11 +15,11 @@ import (
 // Проброс наружу методов
 type Pools interface {
 	ServePool(ctx context.Context)
-	CheckRoom(ctx context.Context, hash string, client Clients.Client)
+	CheckRoom(ctx context.Context, hash string, client Clients.Clients)
 	DeleteRoom(hash string)
 }
 type Pool struct {
-	rooms      map[string]chan Clients.Client // кладём хеш комнаты и канал для записи новых пользователей
+	rooms      map[string]chan Clients.Clients // кладём хеш комнаты и канал для записи новых пользователей
 	newRoom    chan Rooms.Rooms
 	deleteRoom chan string //сравниваем хеши и удаляет
 	logger     logger.Logger
@@ -31,7 +31,7 @@ type Pool struct {
 
 func NewPool(querier db.Querier, redisInterface redis.RedisInterface, config config.Config, logger logger.Logger) Pools {
 	return &Pool{
-		rooms:      make(map[string]chan Clients.Client),
+		rooms:      make(map[string]chan Clients.Clients),
 		newRoom:    make(chan Rooms.Rooms, config.MaxEntryBuffSize),
 		deleteRoom: make(chan string, config.MaxEntryBuffSize),
 		logger:     logger,
@@ -58,7 +58,7 @@ func (p *Pool) ServePool(ctx context.Context) {
 }
 
 // Выставляем наружу метод, который проверяет комнату
-func (p *Pool) CheckRoom(ctx context.Context, hash string, client Clients.Client) {
+func (p *Pool) CheckRoom(ctx context.Context, hash string, client Clients.Clients) {
 	//Если комната есть, то засовывает в неё нового юзера
 	if room, ok := p.rooms[hash]; ok {
 		room <- client
