@@ -7,7 +7,7 @@ import (
 )
 
 func MapRedisMessageToClientMsg(redisMsg *redis.Message) (*models.ClientMessage, error) {
-	var msg *models.ClientMessage
+	var msg = new(models.ClientMessage)
 	if err := json.Unmarshal([]byte(redisMsg.Payload), msg); err != nil {
 		return nil, err
 	}

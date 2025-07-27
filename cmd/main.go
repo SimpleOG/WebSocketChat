@@ -9,7 +9,6 @@ import (
 	db "github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/redis"
 	"github.com/SimpleOG/WebSocketChat/internal/service"
-	"github.com/SimpleOG/WebSocketChat/internal/service/Pools"
 	auth "github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/config"
 	"github.com/gin-contrib/cors"
@@ -17,11 +16,13 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
+	"net/http"
 )
 
 func main() {
@@ -56,7 +57,6 @@ func main() {
 	jwtMaker := auth.NewJWTMaker(config.SecretKey)
 
 	service := service.NewService(logger, jwtMaker, querier, redis, config)
-	pool := Pools.NewPool(querier, redis, config, logger)
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
@@ -67,14 +67,15 @@ func main() {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
 	middlewares := middlewares.NewMiddleware(jwtMaker)
-	server := server.NewServer(logger, router, service, pool, middlewares)
+	server := server.NewServer(&logger, router, service, middlewares, &upgrader)
+
 	if err := server.Run(ctx, config.ServerAddress); err != nil {
 		logger.Fatal("Cannot start server  :", zap.Error(err))
 		return
-	} else {
-
 	}
 
 	//quit := make(chan os.Signal, 1)

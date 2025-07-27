@@ -8,6 +8,7 @@ import (
 	"github.com/SimpleOG/WebSocketChat/internal/service"
 	"github.com/SimpleOG/WebSocketChat/internal/service/Pools"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 type Server struct {
@@ -15,13 +16,14 @@ type Server struct {
 	controllers *controllers.Controllers
 	pools       Pools.Pools
 	middleware  middlewares.Middleware
+	Upgrader    websocket.Upgrader
 }
 
-func NewServer(logger logger.Logger, engine *gin.Engine, service *service.Service, pools Pools.Pools, middleware middlewares.Middleware) *Server {
+func NewServer(logger *logger.Logger, engine *gin.Engine, service *service.Service, middleware middlewares.Middleware, upgrader *websocket.Upgrader) *Server {
 	return &Server{
 		router:      engine,
-		controllers: controllers.NewControllers(logger, service),
-		pools:       pools,
+		controllers: controllers.NewControllers(logger, service, upgrader),
+		pools:       service.Pool,
 		middleware:  middleware,
 	}
 }
@@ -36,9 +38,10 @@ func (s *Server) SetupRoutes() {
 	s.SetupAuthRoutes(api)
 }
 func (s *Server) SetupRoomsRoutes(api *gin.RouterGroup) {
-	rooms := api.Group("/rooms")
+	rooms := api.Group("/rooms", s.middleware.ValidateToken)
 	{
-		rooms.POST("/room", s.middleware.ValidateToken, s.controllers.RoomControllers.ServeRooms)
+		rooms.POST("/", s.controllers.RoomControllers.Rooms)
+		rooms.GET("/", s.controllers.RoomControllers.ServeRooms)
 	}
 }
 func (s *Server) SetupAuthRoutes(api *gin.RouterGroup) {

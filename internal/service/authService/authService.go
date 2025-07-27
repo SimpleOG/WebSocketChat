@@ -6,29 +6,31 @@ import (
 	"fmt"
 	"github.com/SimpleOG/WebSocketChat/internal/logger"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
-	auth "github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
+	"github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/hashing"
+	"github.com/golang-jwt/jwt"
 	"github.com/jackc/pgx/v5"
-	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
+	"time"
 )
 
 type AuthorizationService interface {
 	RegisterUser(ctx context.Context, userData db.CreateUserParams) (int32, error)
 	GetUser(ctx context.Context, userId int32) (db.User, error)
-	LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (db.User, error)
+	LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (string, error)
 }
 
 type Authorization struct {
-	logger logger.Logger
-	maker  auth.JWTMaker
+	maker  JWTTokens.JWTMaker
 	q      db.Querier
+	logger logger.Logger
 }
 
-func NewAuthService(maker auth.JWTMaker, q db.Querier, logger logger.Logger) AuthorizationService {
+func NewAuthService(maker JWTTokens.JWTMaker, q db.Querier, logger logger.Logger) AuthorizationService {
 	return &Authorization{
 		maker:  maker,
-		logger: logger,
 		q:      q,
+		logger: logger,
 	}
 }
 
@@ -48,9 +50,7 @@ func (a *Authorization) RegisterUser(ctx context.Context, userData db.CreateUser
 func (a *Authorization) GetUser(ctx context.Context, userId int32) (db.User, error) {
 	user, err := a.q.GetUsersById(ctx, userId)
 	if err != nil {
-
 		if !errors.Is(err, pgx.ErrNoRows) {
-			a.logger.Error("Отсуствует пользователь с id ", zap.Int32("id", user.ID))
 			return db.User{}, fmt.Errorf("no users was detected")
 		}
 	}
@@ -58,16 +58,28 @@ func (a *Authorization) GetUser(ctx context.Context, userId int32) (db.User, err
 	return user, nil
 }
 
-func (a *Authorization) LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (db.User, error) {
+func (a *Authorization) LoginUser(ctx context.Context, loginData db.GetUserForLoginParams) (string, error) {
+	unameEmail := db.GetUserByUsernameOrEmailParams{
+		Username: loginData.Username,
+		Email:    loginData.Email,
+	}
 
-	hashedPass, err := hashing.GeneratePassword(loginData.Password)
+	//Сначала найти юзера и взять его хеш
+	user, err := a.q.GetUserByUsernameOrEmail(ctx, unameEmail)
 	if err != nil {
-		return db.User{}, err
+		return "", err
 	}
-	loginData.Password = hashedPass
-	User, err := a.q.GetUserForLogin(ctx, loginData)
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password))
 	if err != nil {
-		return db.User{}, err
+		return "", err
 	}
-	return User, err
+	claims := &jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(60 * time.Minute).Unix(),
+	}
+	userToken, err := a.maker.CreateToken(claims)
+	if err != nil {
+		return "", err
+	}
+	return userToken, err
 }

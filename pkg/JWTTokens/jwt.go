@@ -7,7 +7,7 @@ import (
 
 type JWTMaker interface {
 	CreateToken(claims *jwt.MapClaims) (string, error)
-	VerifyToken(tokenStr string) (*jwt.MapClaims, error)
+	VerifyToken(tokenStr string) (jwt.MapClaims, error)
 }
 
 type Maker struct {
@@ -26,7 +26,7 @@ func (j *Maker) CreateToken(claims *jwt.MapClaims) (string, error) {
 	}
 	return tokenStr, nil
 }
-func (j *Maker) VerifyToken(tokenStr string) (*jwt.MapClaims, error) {
+func (j *Maker) VerifyToken(tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		_, ok := token.Method.(*jwt.SigningMethodHMAC)
 		if !ok {
@@ -37,7 +37,7 @@ func (j *Maker) VerifyToken(tokenStr string) (*jwt.MapClaims, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while pasring token %v", err)
 	}
-	claims, ok := token.Claims.(*jwt.MapClaims)
+	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		return nil, fmt.Errorf("invalid token claims")
 	}
