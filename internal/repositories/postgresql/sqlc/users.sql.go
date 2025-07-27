@@ -46,14 +46,19 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const getUserByUsername = `-- name: GetUserByUsername :one
+const getUserByUsernameOrEmail = `-- name: GetUserByUsernameOrEmail :one
 SELECT id, username, email, date_of_birth, password, created_at
 FROM users
-WHERE username = $1
+WHERE username = $1 or email=$2
 `
 
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByUsername, username)
+type GetUserByUsernameOrEmailParams struct {
+	Username string      `json:"username"`
+	Email    pgtype.Text `json:"email"`
+}
+
+func (q *Queries) GetUserByUsernameOrEmail(ctx context.Context, arg GetUserByUsernameOrEmailParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsernameOrEmail, arg.Username, arg.Email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -69,17 +74,18 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 const getUserForLogin = `-- name: GetUserForLogin :one
 SELECT id, username, email, date_of_birth, password, created_at
 FROM users
-WHERE (username = $1 or email = $1)
-  and password = $2
+WHERE (username = $1 or email = $2)
+  and password = $3
 `
 
 type GetUserForLoginParams struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string      `json:"username"`
+	Email    pgtype.Text `json:"email"`
+	Password string      `json:"password"`
 }
 
 func (q *Queries) GetUserForLogin(ctx context.Context, arg GetUserForLoginParams) (User, error) {
-	row := q.db.QueryRow(ctx, getUserForLogin, arg.Username, arg.Password)
+	row := q.db.QueryRow(ctx, getUserForLogin, arg.Username, arg.Email, arg.Password)
 	var i User
 	err := row.Scan(
 		&i.ID,

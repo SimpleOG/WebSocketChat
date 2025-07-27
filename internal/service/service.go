@@ -6,7 +6,7 @@ import (
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/redis"
 	"github.com/SimpleOG/WebSocketChat/internal/service/Pools"
 	"github.com/SimpleOG/WebSocketChat/internal/service/authService"
-	auth "github.com/SimpleOG/WebSocketChat/pkg"
+	auth "github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/config"
 )
 

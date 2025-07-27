@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/SimpleOG/WebSocketChat/internal/logger"
 	"github.com/SimpleOG/WebSocketChat/internal/repositories/postgresql/sqlc"
-	"github.com/SimpleOG/WebSocketChat/pkg"
+	auth "github.com/SimpleOG/WebSocketChat/pkg/JWTTokens"
 	"github.com/SimpleOG/WebSocketChat/util/hashing"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
